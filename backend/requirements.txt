@@ -1,0 +1,10 @@
+flask
+gunicorn
+apache-beam[gcp]
+google-cloud-storage
+google-cloud-speech
+google-cloud-bigquery
+librosa
+noisereduce
+soundfile
+webrtcvad-wheels
