@@ -1,3 +1,5 @@
+logsBucket: 'gs://voice-data-pipeline_cloudbuild'
+
 steps:
 
   # ── BACKEND ──────────────────────────────────────────
