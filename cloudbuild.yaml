@@ -9,8 +9,11 @@ steps:
     args:
       - '-c'
       - |
-        git fetch --depth=2 origin master
-        git diff --name-only HEAD~1 HEAD | grep '^backend/' && echo "BACKEND_CHANGED=true" > /workspace/flags || echo "BACKEND_CHANGED=false" > /workspace/flags
+        if git log --oneline | wc -l | grep -q "^1$"; then
+          echo "BACKEND_CHANGED=true" > /workspace/flags
+        else
+          git diff --name-only HEAD~1 HEAD | grep '^backend/' && echo "BACKEND_CHANGED=true" > /workspace/flags || echo "BACKEND_CHANGED=false" > /workspace/flags
+        fi
 
   - name: 'gcr.io/cloud-builders/docker'
     id: 'build-backend'
@@ -60,8 +63,11 @@ steps:
     args:
       - '-c'
       - |
-        git fetch --depth=2 origin master
-        git diff --name-only HEAD~1 HEAD | grep '^frontend/' && echo "FRONTEND_CHANGED=true" >> /workspace/flags || echo "FRONTEND_CHANGED=false" >> /workspace/flags
+        if git log --oneline | wc -l | grep -q "^1$"; then
+          echo "FRONTEND_CHANGED=true" >> /workspace/flags
+        else
+          git diff --name-only HEAD~1 HEAD | grep '^frontend/' && echo "FRONTEND_CHANGED=true" >> /workspace/flags || echo "FRONTEND_CHANGED=false" >> /workspace/flags
+        fi
 
   - name: 'gcr.io/cloud-builders/docker'
     id: 'build-frontend'
