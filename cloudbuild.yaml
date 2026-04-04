@@ -1,0 +1,103 @@
+steps:
+
+  # ── BACKEND ──────────────────────────────────────────
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'check-backend'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        git diff --name-only HEAD~1 HEAD | grep '^backend/' && echo "BACKEND_CHANGED=true" > /workspace/flags || echo "BACKEND_CHANGED=false" > /workspace/flags
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-backend'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        source /workspace/flags
+        if [ "$$BACKEND_CHANGED" = "true" ]; then
+          docker build -t europe-west1-docker.pkg.dev/voice-data-pipeline/voice-pipeline-repo/voice-pipeline-cloudrun ./backend
+        fi
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-backend'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        source /workspace/flags
+        if [ "$$BACKEND_CHANGED" = "true" ]; then
+          docker push europe-west1-docker.pkg.dev/voice-data-pipeline/voice-pipeline-repo/voice-pipeline-cloudrun
+        fi
+
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'deploy-backend'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        source /workspace/flags
+        if [ "$$BACKEND_CHANGED" = "true" ]; then
+          gcloud run deploy voice-pipeline-cloudrun \
+            --image=europe-west1-docker.pkg.dev/voice-data-pipeline/voice-pipeline-repo/voice-pipeline-cloudrun:latest \
+            --platform=managed \
+            --region=europe-west1 \
+            --allow-unauthenticated \
+            --service-account=voice-pipeline-sa@voice-data-pipeline.iam.gserviceaccount.com \
+            --memory=4Gi \
+            --cpu=2 \
+            --timeout=3600
+        fi
+
+  # ── FRONTEND ─────────────────────────────────────────
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'check-frontend'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        git diff --name-only HEAD~1 HEAD | grep '^frontend/' && echo "FRONTEND_CHANGED=true" >> /workspace/flags || echo "FRONTEND_CHANGED=false" >> /workspace/flags
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-frontend'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        source /workspace/flags
+        if [ "$$FRONTEND_CHANGED" = "true" ]; then
+          docker build -t europe-west1-docker.pkg.dev/voice-data-pipeline/voice-pipeline-repo/voicescribe ./frontend
+        fi
+
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-frontend'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        source /workspace/flags
+        if [ "$$FRONTEND_CHANGED" = "true" ]; then
+          docker push europe-west1-docker.pkg.dev/voice-data-pipeline/voice-pipeline-repo/voicescribe
+        fi
+
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: 'deploy-frontend'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        source /workspace/flags
+        if [ "$$FRONTEND_CHANGED" = "true" ]; then
+          gcloud run deploy voicescribe \
+            --image=europe-west1-docker.pkg.dev/voice-data-pipeline/voice-pipeline-repo/voicescribe:latest \
+            --platform=managed \
+            --region=europe-west1 \
+            --allow-unauthenticated \
+            --service-account=voice-pipeline-sa@voice-data-pipeline.iam.gserviceaccount.com \
+            --memory=1Gi
+        fi
+
+images:
+  - 'europe-west1-docker.pkg.dev/voice-data-pipeline/voice-pipeline-repo/voice-pipeline-cloudrun'
+  - 'europe-west1-docker.pkg.dev/voice-data-pipeline/voice-pipeline-repo/voicescribe'
