@@ -9,6 +9,7 @@ steps:
     args:
       - '-c'
       - |
+        git fetch --depth=2 origin master
         git diff --name-only HEAD~1 HEAD | grep '^backend/' && echo "BACKEND_CHANGED=true" > /workspace/flags || echo "BACKEND_CHANGED=false" > /workspace/flags
 
   - name: 'gcr.io/cloud-builders/docker'
@@ -59,6 +60,7 @@ steps:
     args:
       - '-c'
       - |
+        git fetch --depth=2 origin master
         git diff --name-only HEAD~1 HEAD | grep '^frontend/' && echo "FRONTEND_CHANGED=true" >> /workspace/flags || echo "FRONTEND_CHANGED=false" >> /workspace/flags
 
   - name: 'gcr.io/cloud-builders/docker'
@@ -99,7 +101,3 @@ steps:
             --service-account=voice-pipeline-sa@voice-data-pipeline.iam.gserviceaccount.com \
             --memory=1Gi
         fi
-
-images:
-  - 'europe-west1-docker.pkg.dev/voice-data-pipeline/voice-pipeline-repo/voice-pipeline-cloudrun'
-  - 'europe-west1-docker.pkg.dev/voice-data-pipeline/voice-pipeline-repo/voicescribe'
