@@ -63,10 +63,49 @@ st.markdown("""
             transform: translateY(-1px);
         }
 
-        /* selectbox */
-        [data-testid="stSelectbox"] {
+        /* language cards */
+        .lang-card {
+            background: #EEEEE8;
+            border: 1.5px solid #BBBBB0;
+            border-radius: 10px;
+            padding: 0.8rem 0.5rem;
+            text-align: center;
             font-family: 'DM Mono', monospace;
-            font-size: 0.82rem;
+            font-size: 0.78rem;
+            letter-spacing: 0.06em;
+            color: #3A3A35;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .lang-card.selected {
+            background: #EAF4EC;
+            border-color: #2B8A3E;
+            color: #1A4A25;
+            transform: scale(1.04);
+            font-weight: 500;
+        }
+
+        /* language card buttons — override default button style */
+        div[data-testid="column"] .stButton > button {
+            background-color: #EEEEE8;
+            color: #3A3A35;
+            border: 1.5px solid #BBBBB0;
+            border-radius: 10px;
+            padding: 0.8rem 0.5rem;
+            font-family: 'DM Mono', monospace;
+            font-size: 0.78rem;
+            font-weight: 400;
+            letter-spacing: 0.06em;
+            text-transform: lowercase;
+            width: 100%;
+            transition: all 0.2s ease;
+            transform: none;
+        }
+        div[data-testid="column"] .stButton > button:hover {
+            background-color: #E0F0E3;
+            border-color: #2B8A3E;
+            color: #1A4A25;
+            transform: scale(1.02);
         }
 
         /* status cards */
@@ -255,6 +294,17 @@ st.markdown("""
             animation: fadeSlideIn 0.5s ease forwards;
         }
 
+        /* selected language card highlight */
+        .lang-selected-indicator {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #2B8A3E;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+
         /* hide streamlit branding */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
@@ -266,10 +316,9 @@ MAX_FILE_SIZE_MB = 30
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 LANGUAGES = {
-    "English":    "en-US",
-    "Uzbek":      "uz-UZ",
-    "Italian":    "it-IT",
-    "Indonesian": "id-ID",
+    "English":  "en-US",
+    "Uzbek":    "uz-UZ",
+    "Italian":  "it-IT",
 }
 
 # session state init
@@ -279,6 +328,8 @@ if "audio_name" not in st.session_state:
     st.session_state.audio_name = None
 if "result" not in st.session_state:
     st.session_state.result = None
+if "selected_language" not in st.session_state:
+    st.session_state.selected_language = "English"
 
 
 def upload_to_gcs(file_bytes, filename):
@@ -396,43 +447,73 @@ st.markdown("""
 # ── IDLE STATE ──────────────────────────────────────────────────────
 if st.session_state.stage == "idle":
 
-    col_upload, col_lang = st.columns([3, 1])
+    # upload section
+    st.markdown(f'<div class="section-label">upload audio file — max {MAX_FILE_SIZE_MB}mb</div>', unsafe_allow_html=True)
+    uploaded_file = st.file_uploader(
+        "drag & drop or browse — mp3, m4a, wav",
+        type=["mp3", "m4a", "wav"],
+        label_visibility="visible"
+    )
 
-    with col_upload:
-        st.markdown(f'<div class="section-label">upload audio file — max {MAX_FILE_SIZE_MB}mb</div>', unsafe_allow_html=True)
-        uploaded_file = st.file_uploader(
-            "drag & drop or browse — mp3, m4a, wav",
-            type=["mp3", "m4a", "wav"],
-            label_visibility="visible"
-        )
+    if uploaded_file:
+        ext = uploaded_file.name.rsplit(".", 1)[-1].lower()
+        if ext not in ["mp3", "m4a", "wav"]:
+            st.markdown("""
+                <div style='font-family: DM Mono, monospace; font-size:0.78rem;
+                            color:#C0392B; margin-top:0.5rem; letter-spacing:0.04em;'>
+                    ✗ &nbsp; unsupported file type — use mp3, m4a, or wav
+                </div>
+            """, unsafe_allow_html=True)
+            uploaded_file = None
+        elif uploaded_file.size > MAX_FILE_SIZE_BYTES:
+            st.markdown(f"""
+                <div style='font-family: DM Mono, monospace; font-size:0.78rem;
+                            color:#C0392B; margin-top:0.5rem; letter-spacing:0.04em;'>
+                    ✗ &nbsp; file too large — maximum size is {MAX_FILE_SIZE_MB}mb
+                </div>
+            """, unsafe_allow_html=True)
+            uploaded_file = None
 
-        if uploaded_file:
-            ext = uploaded_file.name.rsplit(".", 1)[-1].lower()
-            if ext not in ["mp3", "m4a", "wav"]:
-                st.markdown("""
-                    <div style='font-family: DM Mono, monospace; font-size:0.78rem;
-                                color:#C0392B; margin-top:0.5rem; letter-spacing:0.04em;'>
-                        ✗ &nbsp; unsupported file type — use mp3, m4a, or wav
-                    </div>
-                """, unsafe_allow_html=True)
-                uploaded_file = None
-            elif uploaded_file.size > MAX_FILE_SIZE_BYTES:
-                st.markdown(f"""
-                    <div style='font-family: DM Mono, monospace; font-size:0.78rem;
-                                color:#C0392B; margin-top:0.5rem; letter-spacing:0.04em;'>
-                        ✗ &nbsp; file too large — maximum size is {MAX_FILE_SIZE_MB}mb
-                    </div>
-                """, unsafe_allow_html=True)
-                uploaded_file = None
+    # language selector
+    st.markdown('<div style="height:1.2rem"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">select language</div>', unsafe_allow_html=True)
 
-    with col_lang:
-        st.markdown('<div class="section-label">language</div>', unsafe_allow_html=True)
-        selected_language = st.selectbox(
-            "language",
-            options=list(LANGUAGES.keys()),
-            label_visibility="collapsed"
-        )
+    col_en, col_uz, col_it = st.columns(3)
 
+    with col_en:
+        selected = st.session_state.selected_language == "English"
+        label = "✓  english" if selected else "english"
+        if st.button(label, key="lang_en"):
+            st.session_state.selected_language = "English"
+            st.rerun()
+        if selected:
+            st.markdown("""
+                <div style='height:3px; background:#2B8A3E; border-radius:2px; margin-top:-8px;'></div>
+            """, unsafe_allow_html=True)
+
+    with col_uz:
+        selected = st.session_state.selected_language == "Uzbek"
+        label = "✓  uzbek" if selected else "uzbek"
+        if st.button(label, key="lang_uz"):
+            st.session_state.selected_language = "Uzbek"
+            st.rerun()
+        if selected:
+            st.markdown("""
+                <div style='height:3px; background:#2B8A3E; border-radius:2px; margin-top:-8px;'></div>
+            """, unsafe_allow_html=True)
+
+    with col_it:
+        selected = st.session_state.selected_language == "Italian"
+        label = "✓  italian" if selected else "italian"
+        if st.button(label, key="lang_it"):
+            st.session_state.selected_language = "Italian"
+            st.rerun()
+        if selected:
+            st.markdown("""
+                <div style='height:3px; background:#2B8A3E; border-radius:2px; margin-top:-8px;'></div>
+            """, unsafe_allow_html=True)
+
+    # record live
     st.markdown('<div style="height:1.2rem"></div>', unsafe_allow_html=True)
     st.markdown('<div class="section-label">or record live</div>', unsafe_allow_html=True)
 
@@ -452,7 +533,7 @@ if st.session_state.stage == "idle":
         st.markdown('<div style="height:0.8rem"></div>', unsafe_allow_html=True)
         if st.button("→  run transcription"):
 
-            language_code = LANGUAGES[selected_language]
+            language_code = LANGUAGES[st.session_state.selected_language]
 
             if uploaded_file:
                 file_bytes = uploaded_file.read()
@@ -557,5 +638,6 @@ elif st.session_state.stage == "done":
             st.rerun()
 
 
-
             
+
+
