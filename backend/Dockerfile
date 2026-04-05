@@ -14,6 +14,7 @@ COPY convert_beam.py .
 COPY normalize_beam.py .
 COPY transcript_beam.py .
 COPY metadata_beam.py .
+COPY features_beam.py .
 
 ENV PYTHONUNBUFFERED=1
 CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--timeout", "0", "orchestrate:app"]

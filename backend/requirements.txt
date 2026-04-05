@@ -8,3 +8,4 @@ librosa
 noisereduce
 soundfile
 webrtcvad-wheels
+numpy
