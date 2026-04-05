@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import base64
 import threading
 import subprocess
@@ -72,6 +73,8 @@ def process_pipeline(file_name, audio_name, raw_audio_path):
     except Exception as e:
         print(f"❌ Registration failed: {e}")
         return
+
+    time.sleep(4)
 
     for script in [
         "convert_beam.py",
