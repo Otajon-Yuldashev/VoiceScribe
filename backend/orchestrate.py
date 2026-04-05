@@ -1,6 +1,7 @@
 import os
 import json
 import base64
+import threading
 import subprocess
 from flask import Flask, request
 
@@ -20,6 +21,23 @@ def run_script(script_name):
         return False
     print(f"✅ {script_name} completed")
     return True
+
+
+def process_pipeline(file_name):
+    print(f"🎙️  Processing: {file_name}")
+
+    for script in [
+        "convert_beam.py",
+        "normalize_beam.py",
+        "transcript_beam.py",
+        "metadata_beam.py",
+        "features_beam.py",
+    ]:
+        if not run_script(script):
+            print(f"❌ Pipeline failed at {script}")
+            return
+
+    print("🎉 Full pipeline completed!")
 
 
 @app.route("/", methods=["POST"])
@@ -45,14 +63,10 @@ def handle_pubsub():
         print("⏭️  Not an audio file — skipping")
         return "OK", 200
 
-    print(f"🎙️  Processing: {file_name}")
+    # run pipeline in background thread — ack Pub/Sub immediately
+    thread = threading.Thread(target=process_pipeline, args=(file_name,))
+    thread.start()
 
-    for script in ["convert_beam.py", "normalize_beam.py",
-                   "transcript_beam.py", "metadata_beam.py"]:
-        if not run_script(script):
-            return "Internal Server Error", 500
-
-    print("🎉 Full pipeline completed!")
     return "OK", 200
 
 
@@ -60,5 +74,3 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port, debug=False)
 
-
-    
