@@ -1,9 +1,8 @@
 import os
-import time
 import tempfile
 import subprocess
 import apache_beam as beam
-from apache_beam.options.pipeline_options import PipelineOptions, StandardOptions, GoogleCloudOptions
+from apache_beam.options.pipeline_options import PipelineOptions
 from google.cloud import storage
 from google.cloud import bigquery
 from google.cloud.bigquery import QueryJobConfig, ScalarQueryParameter
@@ -15,69 +14,51 @@ BUCKET = "voice_data_bucket_demo"
 REGION = "europe-west1"
 
 
+def register_file(audio_name, raw_audio_path):
+    """Register a single file into pipeline_status if not already there."""
+    bq_client = bigquery.Client()
+    now = datetime.now().isoformat()
+    job_config = QueryJobConfig(
+        query_parameters=[
+            ScalarQueryParameter("audio_name", "STRING", audio_name),
+            ScalarQueryParameter("raw_audio_path", "STRING", raw_audio_path),
+            ScalarQueryParameter("created_at", "STRING", now),
+            ScalarQueryParameter("updated_at", "STRING", now),
+        ]
+    )
+    bq_client.query("""
+        MERGE voice_data.pipeline_status T
+        USING (SELECT @audio_name as audio_name) S
+        ON T.audio_name = S.audio_name
+        WHEN NOT MATCHED THEN
+            INSERT (
+                audio_name, raw_audio_path,
+                converted_path, normalized_path, transcript_path,
+                is_converted, is_normalized, is_transcribed, is_metadata_loaded,
+                failed_at_stage, error_message,
+                created_at, updated_at
+            )
+            VALUES (
+                @audio_name, @raw_audio_path,
+                NULL, NULL, NULL,
+                FALSE, FALSE, FALSE, FALSE,
+                NULL, NULL,
+                @created_at, @updated_at
+            )
+    """, job_config=job_config).result()
+    print(f"  ✅ Registered: {audio_name}")
+
+
 def get_unprocessed_files():
     bq_client = bigquery.Client()
     query = """
         SELECT audio_name, raw_audio_path
         FROM voice_data.pipeline_status
         WHERE is_converted = FALSE
+        AND failed_at_stage IS NULL
     """
     results = bq_client.query(query).result()
     return [(row.audio_name, row.raw_audio_path) for row in results]
-
-
-def register_new_files():
-    storage_client = storage.Client()
-    bq_client = bigquery.Client()
-    bucket = storage_client.get_bucket(BUCKET)
-
-    query = "SELECT audio_name FROM voice_data.pipeline_status"
-    registered = {row.audio_name for row in bq_client.query(query).result()}
-
-    blobs = bucket.list_blobs(prefix="raw_audio/")
-
-    for blob in blobs:
-        if blob.name.endswith((".wav", ".mp3", ".m4a")):
-            filename = blob.name.split("/")[-1]
-            audio_name = filename.rsplit(".", 1)[0]
-
-            if audio_name not in registered:
-                now = datetime.now().isoformat()
-                raw_audio_path = f"gs://{BUCKET}/{blob.name}"
-
-                # use MERGE to insert new file — no streaming buffer issue
-                job_config = QueryJobConfig(
-                    query_parameters=[
-                        ScalarQueryParameter("audio_name", "STRING", audio_name),
-                        ScalarQueryParameter("raw_audio_path", "STRING", raw_audio_path),
-                        ScalarQueryParameter("created_at", "STRING", now),
-                        ScalarQueryParameter("updated_at", "STRING", now),
-                    ]
-                )
-                bq_client.query("""
-                    MERGE voice_data.pipeline_status T
-                    USING (SELECT @audio_name as audio_name) S
-                    ON T.audio_name = S.audio_name
-                    WHEN NOT MATCHED THEN
-                        INSERT (
-                            audio_name, raw_audio_path,
-                            converted_path, normalized_path, transcript_path,
-                            is_converted, is_normalized, is_transcribed, is_metadata_loaded,
-                            failed_at_stage, error_message,
-                            created_at, updated_at
-                        )
-                        VALUES (
-                            @audio_name, @raw_audio_path,
-                            NULL, NULL, NULL,
-                            FALSE, FALSE, FALSE, FALSE,
-                            NULL, NULL,
-                            @created_at, @updated_at
-                        )
-                """, job_config=job_config).result()
-
-                print(f"  ✅ Registered: {audio_name}")
-
-    print("✅ Registration complete")
 
 
 class ConvertToWavFn(beam.DoFn):
@@ -130,7 +111,7 @@ class ConvertToWavFn(beam.DoFn):
             bucket.blob(converted_filename).upload_from_filename(wav_path)
             print(f"  💾 Saved to gs://{BUCKET}/{converted_filename}")
 
-            # MERGE to update pipeline_status
+            # update pipeline_status
             job_config = QueryJobConfig(
                 query_parameters=[
                     ScalarQueryParameter("audio_name", "STRING", audio_name),
@@ -174,8 +155,10 @@ class ConvertToWavFn(beam.DoFn):
 
         finally:
             for path in [tmp_path, wav_path]:
-                if path and os.path.exists(path):
+                if path and path != tmp_path and os.path.exists(path):
                     os.remove(path)
+            if tmp_path and os.path.exists(tmp_path):
+                os.remove(tmp_path)
 
 
 def run():
@@ -183,7 +166,6 @@ def run():
     print(f"Starting Beam conversion at {datetime.now()}")
     print(f"{'='*50}\n")
 
-    register_new_files()
     unprocessed = get_unprocessed_files()
 
     if not unprocessed:
@@ -192,12 +174,13 @@ def run():
 
     print(f"Found {len(unprocessed)} files to convert")
 
-    options = PipelineOptions()
-    options.view_as(StandardOptions).runner = "DirectRunner"
-
-    google_cloud_options = options.view_as(GoogleCloudOptions)
-    google_cloud_options.project = PROJECT
-    google_cloud_options.region = REGION
+    options = PipelineOptions([
+        '--runner=DirectRunner',
+        '--direct_running_mode=multi_threading',
+        '--direct_num_workers=1',
+        f'--project={PROJECT}',
+        f'--region={REGION}',
+    ])
 
     with beam.Pipeline(options=options) as pipeline:
         (
@@ -214,9 +197,4 @@ def run():
 
 if __name__ == "__main__":
     run()
-
-
-    
-
-
 
