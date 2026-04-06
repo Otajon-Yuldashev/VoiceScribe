@@ -1,7 +1,17 @@
-logsBucket: 'gs://voice-data-pipeline_cloudbuild'
+# ============================================================
+# VoiceScribe — Cloud Build CI/CD Pipeline
+#
+# Before using this file, replace the following placeholders:
+#   YOUR_PROJECT_ID        — your GCP project ID
+#   YOUR_REGION            — e.g. europe-west1
+#   YOUR_REPO_NAME         — your Artifact Registry repo name
+#   YOUR_SERVICE_ACCOUNT   — e.g. my-sa@my-project.iam.gserviceaccount.com
+#   YOUR_LOGS_BUCKET       — GCS bucket for Cloud Build logs
+# ============================================================
+
+logsBucket: 'gs://YOUR_LOGS_BUCKET'
 
 steps:
-
   # ── BACKEND ──────────────────────────────────────────
   - name: 'gcr.io/cloud-builders/gcloud'
     id: 'check-backend'
@@ -23,7 +33,7 @@ steps:
       - |
         source /workspace/flags
         if [ "$$BACKEND_CHANGED" = "true" ]; then
-          docker build -t europe-west1-docker.pkg.dev/voice-data-pipeline/voice-pipeline-repo/voice-pipeline-cloudrun ./backend
+          docker build -t YOUR_REGION-docker.pkg.dev/YOUR_PROJECT_ID/YOUR_REPO_NAME/voice-pipeline-cloudrun ./backend
         fi
 
   - name: 'gcr.io/cloud-builders/docker'
@@ -34,7 +44,7 @@ steps:
       - |
         source /workspace/flags
         if [ "$$BACKEND_CHANGED" = "true" ]; then
-          docker push europe-west1-docker.pkg.dev/voice-data-pipeline/voice-pipeline-repo/voice-pipeline-cloudrun
+          docker push YOUR_REGION-docker.pkg.dev/YOUR_PROJECT_ID/YOUR_REPO_NAME/voice-pipeline-cloudrun
         fi
 
   - name: 'gcr.io/cloud-builders/gcloud'
@@ -46,11 +56,11 @@ steps:
         source /workspace/flags
         if [ "$$BACKEND_CHANGED" = "true" ]; then
           gcloud run deploy voice-pipeline-cloudrun \
-            --image=europe-west1-docker.pkg.dev/voice-data-pipeline/voice-pipeline-repo/voice-pipeline-cloudrun:latest \
+            --image=YOUR_REGION-docker.pkg.dev/YOUR_PROJECT_ID/YOUR_REPO_NAME/voice-pipeline-cloudrun:latest \
             --platform=managed \
-            --region=europe-west1 \
+            --region=YOUR_REGION \
             --allow-unauthenticated \
-            --service-account=voice-pipeline-sa@voice-data-pipeline.iam.gserviceaccount.com \
+            --service-account=YOUR_SERVICE_ACCOUNT \
             --memory=4Gi \
             --cpu=2 \
             --timeout=3600
@@ -77,7 +87,7 @@ steps:
       - |
         source /workspace/flags
         if [ "$$FRONTEND_CHANGED" = "true" ]; then
-          docker build -t europe-west1-docker.pkg.dev/voice-data-pipeline/voice-pipeline-repo/voicescribe ./frontend
+          docker build -t YOUR_REGION-docker.pkg.dev/YOUR_PROJECT_ID/YOUR_REPO_NAME/voicescribe ./frontend
         fi
 
   - name: 'gcr.io/cloud-builders/docker'
@@ -88,7 +98,7 @@ steps:
       - |
         source /workspace/flags
         if [ "$$FRONTEND_CHANGED" = "true" ]; then
-          docker push europe-west1-docker.pkg.dev/voice-data-pipeline/voice-pipeline-repo/voicescribe
+          docker push YOUR_REGION-docker.pkg.dev/YOUR_PROJECT_ID/YOUR_REPO_NAME/voicescribe
         fi
 
   - name: 'gcr.io/cloud-builders/gcloud'
@@ -100,10 +110,10 @@ steps:
         source /workspace/flags
         if [ "$$FRONTEND_CHANGED" = "true" ]; then
           gcloud run deploy voicescribe \
-            --image=europe-west1-docker.pkg.dev/voice-data-pipeline/voice-pipeline-repo/voicescribe:latest \
+            --image=YOUR_REGION-docker.pkg.dev/YOUR_PROJECT_ID/YOUR_REPO_NAME/voicescribe:latest \
             --platform=managed \
-            --region=europe-west1 \
+            --region=YOUR_REGION \
             --allow-unauthenticated \
-            --service-account=voice-pipeline-sa@voice-data-pipeline.iam.gserviceaccount.com \
+            --service-account=YOUR_SERVICE_ACCOUNT \
             --memory=1Gi
         fi
