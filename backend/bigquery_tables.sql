@@ -57,16 +57,5 @@ CREATE TABLE IF NOT EXISTS `voice-data-pipeline.voice_data.audio_features` (
 );
 
 
--- ============================================================
--- QUERY: find files ready for feature extraction
--- (used in features_beam.py get_unprocessed_files)
--- ============================================================
 
--- SELECT ps.audio_name, ps.normalized_path
--- FROM voice_data.pipeline_status ps
--- LEFT JOIN voice_data.audio_features af
---     ON ps.audio_name = af.audio_name
--- WHERE ps.is_normalized = TRUE
--- AND ps.failed_at_stage IS NULL
--- AND DATE(ps.created_at) >= '2026-04-05'
 -- AND af.audio_name IS NULL;
