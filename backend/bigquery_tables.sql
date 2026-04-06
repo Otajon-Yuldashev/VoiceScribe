@@ -58,4 +58,4 @@ CREATE TABLE IF NOT EXISTS `voice-data-pipeline.voice_data.audio_features` (
 
 
 
--- AND af.audio_name IS NULL;
+
