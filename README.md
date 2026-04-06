@@ -46,6 +46,7 @@ User uploads audio (mp3 / m4a / wav)
 ```
 VoiceScribe/
 ├── backend/
+|   └── bigquery_tables.sql  # BigQuery table definitions
 │   ├── orchestrate.py       # Flask app — receives Pub/Sub, runs pipeline
 │   ├── convert_beam.py      # Audio format conversion
 │   ├── normalize_beam.py    # VAD + noise reduction
@@ -58,8 +59,6 @@ VoiceScribe/
 │   ├── web.py               # Streamlit UI
 │   ├── requirements.txt
 │   └── Dockerfile
-├── sql/
-│   └── bigquery_tables.sql  # BigQuery table definitions
 ├── cloudbuild.yaml           # CI/CD pipeline
 ├── .gitignore
 └── README.md
